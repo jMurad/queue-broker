@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
@@ -18,11 +20,20 @@ type queue struct {
 }
 
 func main() {
+	port := flag.Int("port", 8080, "port to listen on")
+
+	flag.Parse()
+
+	if *port == 0 {
+		fmt.Println("usage: queue_broker -port=N")
+		return
+	}
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", handler)
 
-	http.ListenAndServe(":8080", mux)
+	http.ListenAndServe(fmt.Sprintf(":%d", *port), mux)
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
