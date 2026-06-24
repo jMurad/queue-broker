@@ -3,21 +3,39 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 func main() {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("PUT /queue", put)
-	mux.HandleFunc("GET /queue", get)
+	mux.HandleFunc("/", handler)
 
 	http.ListenAndServe(":8080", mux)
 }
 
-func put(w http.ResponseWriter, r *http.Request) {
+func handler(w http.ResponseWriter, r *http.Request) {
+	qname := strings.Split(strings.Trim(r.URL.Path, "/"), "/")[0]
+	// qname := r.URL.Path[1:]
+	// if qname == "" {
+	// http.NotFound(w, r)
+	// 	return
+	// }
+
+	switch r.Method {
+	case http.MethodPut:
+		put(w, r, qname)
+	case http.MethodGet:
+		get(w, r, qname)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+func put(w http.ResponseWriter, r *http.Request, qname string) {
 	fmt.Fprint(w, "")
 }
 
-func get(w http.ResponseWriter, r *http.Request) {
+func get(w http.ResponseWriter, r *http.Request, qname string) {
 	fmt.Fprint(w, "")
 }
