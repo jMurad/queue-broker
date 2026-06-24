@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 )
@@ -33,9 +32,17 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func put(w http.ResponseWriter, r *http.Request, qname string) {
+	msg := r.URL.Query().Get("v")
+	if msg == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	fmt.Fprint(w, "")
 }
 
 func get(w http.ResponseWriter, r *http.Request, qname string) {
+	timeoutStr := r.URL.Query().Get("timeout")
+
 	fmt.Fprint(w, "")
 }
