@@ -2,6 +2,11 @@ package main
 
 import (
 	"net/http"
+	"strconv"
+	"sync"
+	"time"
+)
+
 var (
 	mu     sync.Mutex
 	queues = make(map[string]*queue)
@@ -59,7 +64,73 @@ func put(w http.ResponseWriter, r *http.Request, qname string) {
 }
 
 func get(w http.ResponseWriter, r *http.Request, qname string) {
-	timeoutStr := r.URL.Query().Get("timeout")
+	mu.Lock()
+	q := getQueue(qname)
+
+	if len(q.messages) > 0 {
+		msg := q.messages[0]
+		q.messages = q.messages[1:]
+		mu.Unlock()
+
+		w.Write([]byte(msg))
+		return
+	}
+
+	var (
+		timeoutCh <-chan time.Time
+		timeout   int
+		err       error
+	)
+
+	if r.URL.Query().Has("timeout") {
+		timeoutStr := r.URL.Query().Get("timeout")
+
+		timeout, err = strconv.Atoi(timeoutStr)
+		if err != nil || timeout < 0 {
+			mu.Unlock()
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		timer := time.NewTimer(time.Duration(timeout) * time.Second)
+		defer timer.Stop()
+
+		timeoutCh = timer.C
+	}
+
+	wt := make(chan string, 1)
+
+	q.waiters = append(q.waiters, wt)
+	mu.Unlock()
+
+	select {
+	case msg := <-wt:
+		w.Write([]byte(msg))
+
+	case <-timeoutCh:
+		mu.Lock()
+
+		removed := false
+
+		for i, wtr := range q.waiters {
+			if wtr == wt {
+				q.waiters = append(q.waiters[:i], q.waiters[i+1:]...)
+				removed = true
+				break
+			}
+		}
+
+		mu.Unlock()
+
+		if removed {
+			http.Error(w, "timeout", http.StatusNotFound)
+			return
+		}
+
+		msg := <-wt
+		w.Write([]byte(msg))
+	}
+}
 
 func getQueue(name string) *queue {
 	q := queues[name]
