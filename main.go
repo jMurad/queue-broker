@@ -21,12 +21,7 @@ func main() {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	qname := strings.Split(strings.Trim(r.URL.Path, "/"), "/")[0]
-	// qname := r.URL.Path[1:]
-	// if qname == "" {
-	// http.NotFound(w, r)
-	// 	return
-	// }
+	qname := r.URL.Path[1:]
 
 	switch r.Method {
 	case http.MethodPut:
@@ -45,7 +40,22 @@ func put(w http.ResponseWriter, r *http.Request, qname string) {
 		return
 	}
 
-	fmt.Fprint(w, "")
+	mu.Lock()
+	q := getQueue(qname)
+
+	if len(q.waiters) > 0 {
+		wt := q.waiters[0]
+		q.waiters = q.waiters[1:]
+		mu.Unlock()
+
+		wt <- msg
+	} else {
+		q.messages = append(q.messages, msg)
+		mu.Unlock()
+	}
+
+	w.WriteHeader(http.StatusOK)
+
 }
 
 func get(w http.ResponseWriter, r *http.Request, qname string) {
