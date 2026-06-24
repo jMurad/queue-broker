@@ -2,8 +2,15 @@ package main
 
 import (
 	"net/http"
-	"strings"
+var (
+	mu     sync.Mutex
+	queues = make(map[string]*queue)
 )
+
+type queue struct {
+	messages []string
+	waiters  []chan string
+}
 
 func main() {
 	mux := http.NewServeMux()
@@ -44,5 +51,11 @@ func put(w http.ResponseWriter, r *http.Request, qname string) {
 func get(w http.ResponseWriter, r *http.Request, qname string) {
 	timeoutStr := r.URL.Query().Get("timeout")
 
-	fmt.Fprint(w, "")
+func getQueue(name string) *queue {
+	q := queues[name]
+	if q == nil {
+		q = &queue{}
+		queues[name] = q
+	}
+	return q
 }
