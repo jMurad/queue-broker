@@ -43,6 +43,10 @@ func main() {
 
 func handler(w http.ResponseWriter, r *http.Request) {
 	qname := r.URL.Path[1:]
+	if qname == "" {
+		http.NotFound(w, r)
+		return
+	}
 
 	switch r.Method {
 	case http.MethodPut:
