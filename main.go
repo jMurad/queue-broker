@@ -82,13 +82,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func put(w http.ResponseWriter, r *http.Request, qname string) {
-	msg := r.URL.Query().Get("v")
-	if msg == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
+func put(qname, msg string) {
 	mu.Lock()
 	q := getQueue(qname)
 
@@ -98,12 +92,11 @@ func put(w http.ResponseWriter, r *http.Request, qname string) {
 		mu.Unlock()
 
 		wt <- msg
-	} else {
-		q.messages = append(q.messages, msg)
-		mu.Unlock()
+		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	q.messages = append(q.messages, msg)
+	mu.Unlock()
 
 }
 
