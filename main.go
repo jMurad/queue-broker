@@ -20,7 +20,7 @@ type queue struct {
 }
 
 func main() {
-	port := flag.Int("port", 8080, "port to listen on")
+	port := flag.Int("port", 0, "port to listen on")
 	flag.Parse()
 
 	if *port == 0 {
