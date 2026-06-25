@@ -100,7 +100,7 @@ func put(qname, msg string) {
 
 }
 
-func get(w http.ResponseWriter, r *http.Request, qname string) {
+func get(qname string, timeout time.Duration) string {
 	mu.Lock()
 	q := getQueue(qname)
 
@@ -109,31 +109,16 @@ func get(w http.ResponseWriter, r *http.Request, qname string) {
 		q.messages = q.messages[1:]
 		mu.Unlock()
 
-		w.Write([]byte(msg))
-		return
+		return msg
 	}
 
-	var (
-		timeoutCh <-chan time.Time
-		timeout   int
-		err       error
-	)
-
-	if r.URL.Query().Has("timeout") {
-		timeoutStr := r.URL.Query().Get("timeout")
-
-		timeout, err = strconv.Atoi(timeoutStr)
-		if err != nil || timeout < 0 {
-			mu.Unlock()
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		timer := time.NewTimer(time.Duration(timeout) * time.Second)
-		defer timer.Stop()
-
-		timeoutCh = timer.C
+	if timeout == 0 {
+		mu.Unlock()
+		return ""
 	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 
 	wt := make(chan string, 1)
 
@@ -142,10 +127,11 @@ func get(w http.ResponseWriter, r *http.Request, qname string) {
 
 	select {
 	case msg := <-wt:
-		w.Write([]byte(msg))
+		return msg
 
-	case <-timeoutCh:
+	case <-timer.C:
 		mu.Lock()
+		q = getQueue(qname)
 
 		removed := false
 
@@ -160,12 +146,12 @@ func get(w http.ResponseWriter, r *http.Request, qname string) {
 		mu.Unlock()
 
 		if removed {
-			http.Error(w, "timeout", http.StatusNotFound)
-			return
+			// http.Error(w, "timeout", http.StatusNotFound)
+			return ""
 		}
 
 		msg := <-wt
-		w.Write([]byte(msg))
+		return msg
 	}
 }
 
