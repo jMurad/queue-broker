@@ -50,9 +50,33 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodPut:
-		put(w, r, qname)
+		msg := r.URL.Query().Get("v")
+		if msg == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		put(qname, msg)
+		w.WriteHeader(http.StatusOK)
+
 	case http.MethodGet:
-		get(w, r, qname)
+		var timeout time.Duration
+
+		timeoutStr := r.URL.Query().Get("timeout")
+		if timeoutStr != "" {
+			t, err := strconv.Atoi(timeoutStr)
+			if err != nil || t <= 0 {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			timeout = time.Duration(t) * time.Second
+		}
+
+		msg := get(qname, timeout)
+		if msg == "" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Write([]byte(msg))
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
