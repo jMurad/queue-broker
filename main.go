@@ -33,7 +33,12 @@ func main() {
 
 	mux.HandleFunc("/", handler)
 
-	http.ListenAndServe(fmt.Sprintf(":%d", *port), mux)
+	fmt.Println("Start server")
+
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), mux); err != nil {
+		panic(err)
+	}
+
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
