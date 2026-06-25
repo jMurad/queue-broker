@@ -21,7 +21,6 @@ type queue struct {
 
 func main() {
 	port := flag.Int("port", 8080, "port to listen on")
-
 	flag.Parse()
 
 	if *port == 0 {
@@ -30,12 +29,12 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-
 	mux.HandleFunc("/", handler)
 
-	fmt.Println("Start server")
+	addr := fmt.Sprintf(":%d", *port)
 
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), mux); err != nil {
+	err := http.ListenAndServe(addr, mux)
+	if err != nil {
 		panic(err)
 	}
 
@@ -55,7 +54,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+
 		put(qname, msg)
+
 		w.WriteHeader(http.StatusOK)
 
 	case http.MethodGet:
@@ -68,15 +69,18 @@ func handler(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
+
 			timeout = time.Duration(t) * time.Second
 		}
 
-		msg := get(qname, timeout)
-		if msg == "" {
+		msg, ok := get(qname, timeout)
+		if !ok {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
+
 		w.Write([]byte(msg))
+
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
@@ -84,55 +88,52 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 func put(qname, msg string) {
 	mu.Lock()
+
 	q := getQueue(qname)
 
 	if len(q.waiters) > 0 {
 		wt := q.waiters[0]
 		q.waiters = q.waiters[1:]
 		mu.Unlock()
-
 		wt <- msg
 		return
 	}
 
 	q.messages = append(q.messages, msg)
 	mu.Unlock()
-
 }
 
-func get(qname string, timeout time.Duration) string {
+func get(qname string, timeout time.Duration) (string, bool) {
 	mu.Lock()
+
 	q := getQueue(qname)
 
 	if len(q.messages) > 0 {
 		msg := q.messages[0]
 		q.messages = q.messages[1:]
 		mu.Unlock()
-
-		return msg
+		return msg, true
 	}
 
 	if timeout == 0 {
 		mu.Unlock()
-		return ""
+		return "", false
 	}
 
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
 	wt := make(chan string, 1)
-
 	q.waiters = append(q.waiters, wt)
 	mu.Unlock()
 
 	select {
 	case msg := <-wt:
-		return msg
+		return msg, true
 
 	case <-timer.C:
 		mu.Lock()
 		q = getQueue(qname)
-
 		removed := false
 
 		for i, wtr := range q.waiters {
@@ -146,12 +147,11 @@ func get(qname string, timeout time.Duration) string {
 		mu.Unlock()
 
 		if removed {
-			// http.Error(w, "timeout", http.StatusNotFound)
-			return ""
+			return "", false
 		}
 
 		msg := <-wt
-		return msg
+		return msg, true
 	}
 }
 
